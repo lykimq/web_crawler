@@ -1,0 +1,6 @@
+(executable
+ (public_name web_crawler)
+ (name main)
+ (libraries web_crawler cohttp-lwt-unix lwt)
+ (preprocess
+  (pps lwt_ppx)))
