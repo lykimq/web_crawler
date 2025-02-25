@@ -1,21 +1,21 @@
-open Effects
-
 type result = {
     url : string
   ; content : string
   ; timestamp : float
 }
 
+(* This function takes a list of urls and fetch their content, timestamping the results, logging the
+   process of fetching *)
 let crawl_urls urls =
   List.filter_map
     (fun url ->
       try
-        log (Printf.sprintf "Fetching %s" url) ;
-        let content = fetch url in
+        Effects.log (Printf.sprintf "Fetching %s" url) ;
+        let content = Effects.fetch url in
         Some { url; content; timestamp = Unix.gettimeofday () }
       with
       | _ ->
-        log (Printf.sprintf "Failed to fetch %s" url) ;
+        Effects.log (Printf.sprintf "Failed to fetch %s" url) ;
         None)
     urls
 

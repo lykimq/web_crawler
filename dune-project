@@ -11,9 +11,17 @@
  (depends
   (ocaml (>= 5.1.0))
   (dune (>= 3.0))
+  (fmt (>= 0.9.0))
+  (logs (>= 0.7.0))
+  (lwt (>= 5.6.1))
   (cohttp-lwt-unix (>= 6.0.0))
   (yojson (>= 2.0.0))
-  (uri (>= 4.0.0))))
+  (tls-lwt (>= 0.15.0))
+  (uri (>= 4.0.0))
+  (cmdliner (>= 1.1.0))
+  (ptime (= 1.2.0))
+  (base (= v0.17.1))
+  (mirage-crypto (= 1.2.0))))
 
 (authors "Author Name <author@example.com>")
 
