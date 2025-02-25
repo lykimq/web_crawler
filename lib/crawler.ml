@@ -19,6 +19,7 @@ let crawl_urls urls =
         None)
     urls
 
+(* Analyze the results, focus on the content length without the actual content *)
 let analyze_results results =
   results
   |> List.filter_map (fun result ->
