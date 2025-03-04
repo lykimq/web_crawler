@@ -1,4 +1,4 @@
 (executable
- (public_name web_crawler)
  (name main)
+ (public_name web_crawler)
  (libraries web_crawler cohttp-lwt-unix lwt))

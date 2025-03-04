@@ -21,7 +21,8 @@
   (cmdliner (>= 1.1.0))
   (ptime (= 1.2.0))
   (base (= v0.17.1))
-  (mirage-crypto (= 1.2.0))))
+  (mirage-crypto (= 1.2.0))
+  (alcotest :with-test)))
 
 (authors "Author Name <author@example.com>")
 

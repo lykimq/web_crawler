@@ -1,63 +1,109 @@
 # OCaml 5.x Effect System - Web Crawler
 
-This is a simple web crawler implementation using OCaml 5's algebraic effects system to handle I/O operations and side effects in a pure functional way.
+A web crawler implementation demonstrating the power of OCaml 5's algebraic effects system for handling side effects in a pure functional way. This project showcases two different approaches to handling side effects in OCaml: traditional monads (using Lwt) and the new effects system.
 
-## Effect System vs Traditional Implementation (Monads)
+## Key Differences: Effects vs Monads
 
-- **Flexibility with Effects**: In the effect-based implementation, the handling of side effects (like logging and fetching) is abstracted away from the core logic. This allows for easy modifications and testing. In the traditional implementation, logging and fetching might be directly embedded in the core logic, making it harder to change or test.
+### 1. Effect Declaration and Handling
 
-- **Separation of Concerns**: The effect-based implementation clearly separates the concerns of fetching and logging from the core logic of crawling URLs. In the traditional implementation, the core logic is mixed with the side effects, leading to less maintainable code. In the example below, the `crawl_urls` function does not need to know how logging and fetching are implemented. It simply calls `Effects.log` and `Effects.fetch`, making it easier to read and maintain.
-
-### Benefits of Using the Effect System
-
-1. **Improved Testability**: Since side effects are handled separately, it becomes easier to write unit tests for the core logic without worrying about the side effects. This leads to more reliable and maintainable tests.
-
-2. **Enhanced Modularity**: The effect system promotes modular design by allowing developers to define and manage side effects independently. This modularity makes it easier to reuse components across different projects.
-
-3. **Easier Refactoring**: With side effects abstracted away, refactoring the core logic becomes less risky. Developers can change the implementation of side effects without affecting the main logic of the application.
-
-4. **Clearer Code**: The separation of concerns leads to clearer and more understandable code. Developers can focus on the core logic without being distracted by the details of side effect management.
-
-5. **Dynamic Effect Handling**: The effect system allows for dynamic handling of effects, enabling more complex behaviors such as effect composition and cancellation, which are difficult to achieve with traditional monadic approaches.
-
-### Example: Fetching URLs
-
-**Effect-based implementation:**
-
+**Effects-based Approach:**
 ```ocaml
+(* Define effects *)
+type _ Effect.t +=
+  | Fetch : url -> string Effect.t
+  | Log : string -> unit Effect.t
+
+(* Simple effect performance *)
+let fetch url = Effect.perform (Fetch url)
+let log msg = Effect.perform (Log msg)
+
+(* Core logic remains clean and simple *)
 let crawl_urls urls =
   List.filter_map
     (fun url ->
       try
         Effects.log (Printf.sprintf "Fetching %s" url) ;
-        (* Side effect handled separately *)
         let content = Effects.fetch url in
         Some { url; content; timestamp = Unix.gettimeofday () }
       with
       | _ ->
-        (* Side effect handled separately *)
         Effects.log (Printf.sprintf "Failed to fetch %s" url) ;
         None)
     urls
 ```
 
-**Traditional implementation (Monad):**
+**Traditional Monadic Approach:**
+```ocaml
+(* Monadic operations are embedded in the type system *)
+let fetch_url url =
+  let open Lwt in
+  Cohttp_lwt_unix.Client.get (Uri.of_string url) >>= fun (resp, body) ->
+  Cohttp_lwt.Body.to_string body >>= fun content ->
+  if resp.status = `OK then return (Some content) else return None
+
+(* Core logic is mixed with monadic operations *)
+let crawl_urls urls =
+  let open Lwt in
+  let fetch_and_log url =
+    log_message (Printf.sprintf "Fetching %s" url) >>= fun () ->
+    fetch_url url >>= fun content_opt ->
+    match content_opt with
+    | Some content ->
+      let timestamp = Unix.gettimeofday () in
+      return (Some { url; content; timestamp })
+    | None ->
+      log_message (Printf.sprintf "Failed to fetch %s" url) >>= fun () ->
+      return None
+  in
+  Lwt_list.filter_map_p fetch_and_log urls
+```
+
+### 2. Key Advantages of Effects
+
+1. **Separation of Concerns**
+   - Effects: Core logic is clean and separated from effect handling
+   - Monads: Effect handling is mixed with core logic, making it harder to read and maintain
+
+2. **Composition and Testing**
+   - Effects: Easy to compose different effects and mock them for testing
+   - Monads: Monad transformers are needed for composition, making testing more complex
+
+3. **Error Handling**
+   - Effects: Natural error handling with try-catch blocks
+   - Monads: Requires explicit error handling through the monad (e.g., `>>=` and `return`)
+
+4. **Code Clarity**
+   - Effects: More readable code with clear separation between computation and effects
+   - Monads: Code can become complex with nested monadic operations
+
+### 3. Implementation Details
+
+The effects-based implementation uses OCaml 5's effect system to handle side effects through a handler:
 
 ```ocaml
-let crawl_urls urls =
-  List.filter_map (fun url ->
-    try
-      (* Direct Logging *)
-      Printf.printf "Fetching %s\n" url;
-      (* Direct I/O operations *)
-      let content = fetch url in
-      Some { url; content; timestamp = Unix.gettimeofday () }
-    with
-    | _ ->
-      (* Direct logging *)
-      Printf.printf "Failed to fetch %s\n" url;
-      None)
-  urls
+let handle_effects f =
+  let open Effects in
+  let handler =
+    {
+      Effect.Deep.retc = (fun x -> x)
+    ; exnc = (fun e -> raise e)
+    ; effc =
+        (fun (type a) (eff : a Effect.t) ->
+          match eff with
+          | Log msg ->
+            Some
+              (fun (k : (a, _) Effect.Deep.continuation) ->
+                Printf.printf "[LOG] %s\n%!" msg ;
+                Effect.Deep.continue k ())
+          | Fetch url ->
+            Some
+              (fun (k : (a, _) Effect.Deep.continuation) ->
+                let content = Lwt_main.run (fetch_with_retry url) in
+                Effect.Deep.continue k content)
+          | _ -> None)
+    }
+  in
+  Effect.Deep.match_with f () handler
 ```
 
 ## Prerequisites
@@ -68,19 +114,22 @@ let crawl_urls urls =
 
 ## Usage
 
-To build and run the web crawler, you can use either of the following methods:
-
-Using Dune:
+To build and run the web crawler:
 
 ```bash
+# Using Dune
 dune build
 dune exec web_crawler
-```
 
-Or using Make:
-
-```bash
+# Or using Make
 make setup
 make build
 make run
 ```
+
+## Project Structure
+
+- `lib/effects.ml`: Core effects definitions and handlers
+- `lib/crawler_effect.ml`: Effects-based crawler implementation
+- `lib/traditional_crawler.ml`: Traditional monadic crawler implementation
+- `bin/main.ml`: Main executable demonstrating both approaches
