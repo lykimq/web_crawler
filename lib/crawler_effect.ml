@@ -31,6 +31,7 @@ let analyze_results results =
 (* Configuration *)
 let max_retries = 3
 let user_agent = "OCaml Web Crawler/1.0"
+let timeout_seconds = 10.0
 
 (* Helper function to create HTTP headers *)
 let create_headers () =
@@ -46,17 +47,27 @@ let fetch_with_retry url =
     else
       let headers = create_headers () in
       let uri = Uri.of_string url in
-      Cohttp_lwt_unix.Client.get ~headers uri >>= fun (resp, body) ->
-      match resp.status with
-      | `OK -> Cohttp_lwt.Body.to_string body
-      | status ->
-        Printf.printf "[WARN] %s returned %s (attempt %d/%d)\n%!" url
-          (Cohttp.Code.string_of_status status)
-          (max_retries - attempts + 1)
-          max_retries ;
-        if attempts > 1
-        then Lwt_unix.sleep 1.0 >>= fun () -> try_fetch (attempts - 1)
-        else Lwt.fail_with (Printf.sprintf "HTTP %s" (Cohttp.Code.string_of_status status))
+      (* Create a timeout promise *)
+      let timeout_promise =
+        Lwt_unix.sleep timeout_seconds >>= fun () ->
+        Lwt.fail_with (Printf.sprintf "Timeout after %.1f seconds" timeout_seconds)
+      in
+      (* Create the actual request promise *)
+      let request_promise =
+        Cohttp_lwt_unix.Client.get ~headers uri >>= fun (resp, body) ->
+        match resp.status with
+        | `OK -> Cohttp_lwt.Body.to_string body
+        | status ->
+          Printf.printf "[WARN] %s returned %s (attempt %d/%d)\n%!" url
+            (Cohttp.Code.string_of_status status)
+            (max_retries - attempts + 1)
+            max_retries ;
+          if attempts > 1
+          then Lwt_unix.sleep 1.0 >>= fun () -> try_fetch (attempts - 1)
+          else Lwt.fail_with (Printf.sprintf "HTTP %s" (Cohttp.Code.string_of_status status))
+      in
+      (* Race between timeout and request *)
+      Lwt.pick [timeout_promise; request_promise]
   in
   try_fetch max_retries
 
