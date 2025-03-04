@@ -14,7 +14,7 @@ let () =
 
   (* Effect-based implementation *)
   Printf.printf "\nStarting effect-based crawler...\n%!" ;
-  let results = Crawler_effect.handle_effects (fun () -> Crawler_effect.crawl_urls urls) in
+  let results = Effects.handle_effects (fun () -> Crawler_effect.crawl_urls urls) in
 
   Printf.printf "\nCrawling Results With Effects:\n%!" ;
   List.iter print_result results ;
